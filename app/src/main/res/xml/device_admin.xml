@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- Device owner receives all policies; this file is required by the system -->
+    </uses-policies>
+</device-admin>

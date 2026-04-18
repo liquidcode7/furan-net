@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FURAN</string>
+    <string name="qs_tile_label">FURAN</string>
+    <string name="device_admin_description">FURAN requires device owner privileges to suspend non-allowlisted applications in dumb mode.</string>
+</resources>
