@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -34,7 +35,6 @@ class NtfyListenerService : Service() {
     companion object {
         private const val CHANNEL_ID = "furan_ntfy_listener"
         private const val NOTIFICATION_ID = 1001
-        const val ACTION_START_LISTENING = "com.liquidfuran.furan.START_NTFY_LISTEN"
     }
 
     override fun onCreate() {
@@ -78,9 +78,13 @@ class NtfyListenerService : Service() {
                             stopSelf()
                         }
                         is ApprovalResult.Denied -> {
+                            // A well-formed but invalid APPROVE message (bad HMAC/expired).
+                            // Flash DENIED state briefly, then return to WAITING — the channel
+                            // stays open so a corrected message can still arrive.
                             Log.w("NtfyListenerService", "Denied: ${result.reason}")
                             prefsRepository.setSigilState(SigilState.DENIED)
-                            stopSelf()
+                            kotlinx.coroutines.delay(3_000)
+                            prefsRepository.setSigilState(SigilState.WAITING)
                         }
                     }
                 }

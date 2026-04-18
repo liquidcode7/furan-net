@@ -45,8 +45,7 @@ class ScheduleWorker @AssistedInject constructor(
             val workManager = WorkManager.getInstance(context)
             val now = LocalDateTime.now()
 
-            // Find the next start and end times across the week
-            val daysToCheck = DayOfWeek.entries
+            // Find the next enabled day and schedule its start + end
             for (offset in 0..6) {
                 val checkDay = DayOfWeek.entries[(now.dayOfWeek.ordinal + offset) % 7]
                 val daySchedule = schedule.forDay(checkDay)

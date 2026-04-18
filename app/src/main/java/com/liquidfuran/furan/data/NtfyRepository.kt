@@ -45,8 +45,18 @@ class NtfyRepository @Inject constructor(
         }
     }
 
+    /**
+     * Subscribes to the approval topic via SSE and emits [ApprovalResult].
+     *
+     * Only emits [ApprovalResult.Denied] when a message explicitly starts with "APPROVE:"
+     * but fails HMAC/timestamp validation — so stray messages to the topic (test pings,
+     * keepalives, etc.) are silently ignored rather than terminating the listener.
+     *
+     * Uses `since=0` so only messages published after subscription are delivered.
+     */
     fun listenForApproval(config: NtfyConfig): Flow<ApprovalResult> = callbackFlow {
-        val url = "${config.serverUrl.trimEnd('/')}/${config.approvalTopic}/sse"
+        // since=0 tells ntfy to stream only new messages from this point forward
+        val url = "${config.serverUrl.trimEnd('/')}/${config.approvalTopic}/sse?since=0"
         val request = Request.Builder().url(url).build()
 
         val listener = object : EventSourceListener() {
@@ -56,16 +66,22 @@ class NtfyRepository @Inject constructor(
                 type: String?,
                 data: String
             ) {
-                // ntfy SSE events wrap messages in JSON; extract the message field
-                val message = extractMessageFromSseData(data)
-                if (message != null) {
-                    val result = processApprovalMessage(message, config.sharedSecret)
-                    trySend(result)
-                    if (result is ApprovalResult.Approved) {
-                        eventSource.cancel()
-                        channel.close()
-                    }
+                // Only process "message" type events (ignore "open", "keepalive", etc.)
+                if (type != "message") return
+
+                val message = extractMessageBody(data) ?: return
+
+                // Silently ignore messages that aren't APPROVE attempts
+                if (!message.startsWith("APPROVE:")) return
+
+                val result = processApproval(message, config.sharedSecret)
+                trySend(result)
+                if (result is ApprovalResult.Approved) {
+                    eventSource.cancel()
+                    channel.close()
                 }
+                // On denial, keep the channel open so the user can try again
+                // (they'd need to restart the request, but we don't hard-close here)
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
@@ -79,21 +95,27 @@ class NtfyRepository @Inject constructor(
         awaitClose { eventSource.cancel() }
     }
 
-    private fun extractMessageFromSseData(data: String): String? {
-        // ntfy SSE data is JSON: {"id":"...","event":"message","time":...,"message":"..."}
+    /**
+     * Extracts the `message` field from ntfy's SSE JSON payload.
+     * ntfy format: {"id":"...","event":"message","time":1234,"message":"..."}
+     */
+    private fun extractMessageBody(data: String): String? {
         return try {
-            val messageRegex = """"message"\s*:\s*"([^"]+)"""".toRegex()
-            messageRegex.find(data)?.groupValues?.getOrNull(1)
+            // Simple extraction — avoids a full JSON dependency for one field
+            val match = """"message"\s*:\s*"((?:[^"\\]|\\.)*)"""".toRegex().find(data)
+            match?.groupValues?.getOrNull(1)
+                ?.replace("\\\"", "\"")
+                ?.replace("\\\\", "\\")
         } catch (e: Exception) {
             null
         }
     }
 
-    private fun processApprovalMessage(message: String, secret: String): ApprovalResult {
+    private fun processApproval(message: String, secret: String): ApprovalResult {
         return if (HmacUtil.verifyApproval(message, secret)) {
             ApprovalResult.Approved
         } else {
-            ApprovalResult.Denied("Invalid or expired approval message")
+            ApprovalResult.Denied("Invalid or expired approval token")
         }
     }
 }

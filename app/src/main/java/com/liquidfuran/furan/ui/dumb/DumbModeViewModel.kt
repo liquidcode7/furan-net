@@ -33,19 +33,19 @@ class DumbModeViewModel @Inject constructor(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
 
+    // _errorMessage is included in the combine so updating it triggers a UI re-emission
     val uiState: StateFlow<DumbUiState> = combine(
         prefsRepository.sigilState,
         prefsRepository.ntfyConfig,
-        prefsRepository.allowlist
-    ) { sigilState, config, allowlist ->
-        Triple(sigilState, config, allowlist)
-    }.map { (sigilState, config, allowlist) ->
+        prefsRepository.allowlist,
+        _errorMessage
+    ) { sigilState, config, allowlist, errorMsg ->
         val apps = appRepository.getAllowlistedApps(allowlist)
         DumbUiState(
             allowlistApps = apps,
             sigilState = sigilState,
             isNtfyConfigured = config.isConfigured,
-            errorMessage = _errorMessage.value
+            errorMessage = errorMsg
         )
     }.stateIn(
         scope = viewModelScope,
@@ -68,7 +68,6 @@ class DumbModeViewModel @Inject constructor(
 
             ntfyRepository.publishUnlockRequest(config).fold(
                 onSuccess = {
-                    // Start the SSE listener service
                     val serviceIntent = Intent(context, NtfyListenerService::class.java)
                     context.startForegroundService(serviceIntent)
                 },

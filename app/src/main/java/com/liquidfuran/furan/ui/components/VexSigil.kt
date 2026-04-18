@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.unit.dp
 import com.liquidfuran.furan.model.SigilState
 import com.liquidfuran.furan.ui.theme.FuranColors
 import kotlin.math.PI
@@ -28,7 +27,7 @@ fun VexSigil(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // --- Rotation for WAITING ---
+    // --- Rotation for WAITING (infinite) ---
     val infiniteTransition = rememberInfiniteTransition(label = "sigil")
     val rotationAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -39,7 +38,7 @@ fun VexSigil(
         label = "rotation"
     )
 
-    // --- Pulse for APPROVED ---
+    // --- Pulse for APPROVED (infinite) ---
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.08f,
@@ -51,31 +50,36 @@ fun VexSigil(
     )
 
     // --- Shake for DENIED ---
-    var shakeCounter by remember { mutableIntStateOf(0) }
-    val shakeOffset by animateFloatAsState(
-        targetValue = if (state == SigilState.DENIED) 1f else 0f,
-        animationSpec = keyframes {
-            durationMillis = 500
-            0f at 0
-            -12f at 60
-            12f at 120
-            -10f at 180
-            10f at 240
-            -6f at 320
-            6f at 380
-            0f at 500
-        },
-        label = "shake"
-    )
+    // Use Animatable so the sequence runs once and returns to 0 correctly.
+    val shakeOffset = remember { Animatable(0f) }
+    LaunchedEffect(state) {
+        if (state == SigilState.DENIED) {
+            shakeOffset.snapTo(0f)
+            shakeOffset.animateTo(
+                targetValue = 0f,
+                animationSpec = keyframes {
+                    durationMillis = 500
+                    0f at 0
+                    -14f at 60
+                    14f at 120
+                    -10f at 200
+                    10f at 280
+                    -6f at 360
+                    6f at 420
+                    0f at 500
+                }
+            )
+        } else {
+            shakeOffset.snapTo(0f)
+        }
+    }
 
     val activeRotation = if (state == SigilState.WAITING) rotationAngle else 0f
     val activeScale = if (state == SigilState.APPROVED) pulseScale else 1f
-    val activeTx = if (state == SigilState.DENIED) shakeOffset else 0f
+    val activeTx = shakeOffset.value
 
-    // Color tints per state
     val primaryColor = when (state) {
         SigilState.DENIED -> FuranColors.Magenta
-        SigilState.APPROVED -> FuranColors.Cyan
         else -> FuranColors.Cyan
     }
     val secondaryColor = when (state) {
@@ -98,19 +102,19 @@ fun VexSigil(
                 onClick = onClick
             )
     ) {
-        val cx = size.width / 2f + activeTx
+        val cx = size.width / 2f
         val cy = size.height / 2f
         val r = size.minDimension / 2f * 0.92f
 
-        rotate(activeRotation, pivot = Offset(size.width / 2f, cy)) {
+        rotate(activeRotation, pivot = Offset(cx, cy)) {
             translate(activeTx, 0f) {
-                drawGlow(cx - activeTx, cy, r, primaryColor, glowAlpha)
-                drawOuterHexagon(cx - activeTx, cy, r, primaryColor)
-                drawMidHexagon(cx - activeTx, cy, r * 0.72f, primaryColor)
-                drawTriangles(cx - activeTx, cy, r * 0.78f, primaryColor, secondaryColor)
-                drawTickMarks(cx - activeTx, cy, r, primaryColor, secondaryColor)
-                drawCenterRing(cx - activeTx, cy, r * 0.18f, primaryColor)
-                drawCenterDot(cx - activeTx, cy, r * 0.06f, secondaryColor)
+                drawGlow(cx, cy, r, primaryColor, glowAlpha)
+                drawOuterHexagon(cx, cy, r, primaryColor)
+                drawMidHexagon(cx, cy, r * 0.72f, primaryColor)
+                drawTriangles(cx, cy, r * 0.78f, primaryColor, secondaryColor)
+                drawTickMarks(cx, cy, r, primaryColor, secondaryColor)
+                drawCenterRing(cx, cy, r * 0.18f, primaryColor)
+                drawCenterDot(cx, cy, r * 0.06f, secondaryColor)
             }
         }
     }
@@ -143,19 +147,11 @@ private fun hexPath(cx: Float, cy: Float, r: Float, rotationDeg: Float = -30f): 
 }
 
 private fun DrawScope.drawOuterHexagon(cx: Float, cy: Float, r: Float, color: Color) {
-    drawPath(
-        path = hexPath(cx, cy, r, -30f),
-        color = color.copy(alpha = 0.28f),
-        style = Stroke(width = 1.5f)
-    )
+    drawPath(hexPath(cx, cy, r, -30f), color = color.copy(alpha = 0.28f), style = Stroke(width = 1.5f))
 }
 
 private fun DrawScope.drawMidHexagon(cx: Float, cy: Float, r: Float, color: Color) {
-    drawPath(
-        path = hexPath(cx, cy, r, 0f),
-        color = color.copy(alpha = 0.18f),
-        style = Stroke(width = 1f)
-    )
+    drawPath(hexPath(cx, cy, r, 0f), color = color.copy(alpha = 0.18f), style = Stroke(width = 1f))
 }
 
 // ── Triangles → 6-point star ─────────────────────────────────────────────────
@@ -173,33 +169,22 @@ private fun trianglePath(cx: Float, cy: Float, r: Float, pointUp: Boolean): Path
     return path
 }
 
-private fun DrawScope.drawTriangles(
-    cx: Float, cy: Float, r: Float,
-    cyanColor: Color, violetColor: Color
-) {
-    // Upward triangle — cyan fill + stroke
+private fun DrawScope.drawTriangles(cx: Float, cy: Float, r: Float, cyanColor: Color, violetColor: Color) {
     drawPath(trianglePath(cx, cy, r, true), cyanColor.copy(alpha = 0.06f))
     drawPath(trianglePath(cx, cy, r, true), cyanColor.copy(alpha = 0.45f), style = Stroke(1.5f))
-
-    // Downward triangle — violet fill + stroke
     drawPath(trianglePath(cx, cy, r, false), violetColor.copy(alpha = 0.06f))
     drawPath(trianglePath(cx, cy, r, false), violetColor.copy(alpha = 0.45f), style = Stroke(1.5f))
 }
 
 // ── Tick marks at hex vertices ────────────────────────────────────────────────
 
-private fun DrawScope.drawTickMarks(
-    cx: Float, cy: Float, r: Float,
-    cyanColor: Color, violetColor: Color
-) {
+private fun DrawScope.drawTickMarks(cx: Float, cy: Float, r: Float, cyanColor: Color, violetColor: Color) {
     for (i in 0..5) {
         val angle = (i * 60 - 30) * PI.toFloat() / 180f
-        val innerR = r * 0.88f
-        val outerR = r * 1.0f
-        val x1 = cx + innerR * cos(angle)
-        val y1 = cy + innerR * sin(angle)
-        val x2 = cx + outerR * cos(angle)
-        val y2 = cy + outerR * sin(angle)
+        val x1 = cx + r * 0.88f * cos(angle)
+        val y1 = cy + r * 0.88f * sin(angle)
+        val x2 = cx + r * cos(angle)
+        val y2 = cy + r * sin(angle)
         val color = if (i % 2 == 0) cyanColor.copy(alpha = 0.7f) else violetColor.copy(alpha = 0.7f)
         drawLine(color = color, start = Offset(x1, y1), end = Offset(x2, y2), strokeWidth = 2f, cap = StrokeCap.Round)
     }
@@ -208,18 +193,11 @@ private fun DrawScope.drawTickMarks(
 // ── Center ring + dot ────────────────────────────────────────────────────────
 
 private fun DrawScope.drawCenterRing(cx: Float, cy: Float, r: Float, color: Color) {
-    drawCircle(
-        color = color.copy(alpha = 0.3f),
-        radius = r,
-        center = Offset(cx, cy),
-        style = Stroke(1f)
-    )
+    drawCircle(color = color.copy(alpha = 0.3f), radius = r, center = Offset(cx, cy), style = Stroke(1f))
 }
 
 private fun DrawScope.drawCenterDot(cx: Float, cy: Float, r: Float, color: Color) {
-    // Outer glow
     drawCircle(color = color.copy(alpha = 0.25f), radius = r * 2.5f, center = Offset(cx, cy))
     drawCircle(color = color.copy(alpha = 0.5f), radius = r * 1.5f, center = Offset(cx, cy))
-    // Core
     drawCircle(color = color, radius = r, center = Offset(cx, cy))
 }
