@@ -140,6 +140,7 @@ fun DumbModeScreen(
             Spacer(Modifier.height(20.dp))
 
             // ── App grid ───────────────────────────────────────────────────────
+            Spacer(Modifier.weight(1f))
             if (state.allowlistApps.isNotEmpty()) {
                 Box(
                     modifier = Modifier
@@ -150,12 +151,8 @@ fun DumbModeScreen(
                 AppGrid(
                     apps = state.allowlistApps,
                     onAppClick = { viewModel.launchApp(it.packageName) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 )
-            } else {
-                Spacer(Modifier.weight(1f))
             }
 
             // ── Footer — long-press to open settings ───────────────────────────

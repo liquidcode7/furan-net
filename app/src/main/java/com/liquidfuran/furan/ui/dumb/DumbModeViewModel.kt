@@ -38,9 +38,10 @@ class DumbModeViewModel @Inject constructor(
         prefsRepository.sigilState,
         prefsRepository.ntfyConfig,
         prefsRepository.allowlist,
+        prefsRepository.allowlistOrder,
         _errorMessage
-    ) { sigilState, config, allowlist, errorMsg ->
-        val apps = appRepository.getAllowlistedApps(allowlist)
+    ) { sigilState, config, allowlist, order, errorMsg ->
+        val apps = appRepository.getAllowlistedAppsOrdered(allowlist, order)
         DumbUiState(
             allowlistApps = apps,
             sigilState = sigilState,

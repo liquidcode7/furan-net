@@ -30,10 +30,10 @@ fun AppGrid(
     modifier: Modifier = Modifier
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
     ) {
         items(apps, key = { it.packageName }) { app ->
@@ -52,7 +52,7 @@ private fun AppGridItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp)
+            .padding(vertical = 12.dp, horizontal = 8.dp)
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
@@ -60,15 +60,15 @@ private fun AppGridItem(
                 .crossfade(true)
                 .build(),
             contentDescription = app.name,
-            modifier = Modifier.size(52.dp)
+            modifier = Modifier.size(64.dp)
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             text = app.name,
             style = TextStyle(
                 fontFamily = JetBrainsMonoFamily,
                 fontWeight = FontWeight.Normal,
-                fontSize = 10.sp,
+                fontSize = 13.sp,
                 color = if (app.isAllowlisted) FuranColors.Cyan else FuranColors.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center
             ),

@@ -32,13 +32,25 @@ class AppRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             getAllLaunchableApps().map { app ->
                 app.copy(isAllowlisted = app.packageName in allowlist)
-            }.sortedWith(
+            }
+        }
+
+    suspend fun getAppsWithAllowlistSorted(allowlist: Set<String>): List<AppInfo> =
+        withContext(Dispatchers.IO) {
+            getAppsWithAllowlist(allowlist).sortedWith(
                 compareByDescending<AppInfo> { it.isAllowlisted }.thenBy { it.name.lowercase() }
             )
         }
 
     suspend fun getAllowlistedApps(allowlist: Set<String>): List<AppInfo> =
         getAppsWithAllowlist(allowlist).filter { it.isAllowlisted }
+
+    suspend fun getAllowlistedAppsOrdered(allowlist: Set<String>, order: List<String>): List<AppInfo> {
+        val apps = getAllowlistedApps(allowlist).associateBy { it.packageName }
+        val ordered = order.mapNotNull { apps[it] }
+        val unordered = apps.values.filter { it.packageName !in order }
+        return ordered + unordered
+    }
 
     fun getAppLabel(packageName: String): String? = runCatching {
         packageManager.getApplicationInfo(packageName, 0)

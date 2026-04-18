@@ -85,7 +85,7 @@ class NtfyRepository @Inject constructor(
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                close(t ?: Exception("SSE connection failed: ${response?.code()}"))
+                close(t ?: Exception("SSE connection failed: ${response?.code}"))
             }
         }
 

@@ -29,6 +29,7 @@ class PrefsRepository @Inject constructor(
         private val KEY_SCHEDULE_ENABLED = booleanPreferencesKey("schedule_enabled")
         private val KEY_SCHEDULE_JSON = stringPreferencesKey("schedule_json")
         private val KEY_ALLOWLIST = stringSetPreferencesKey("allowlist_packages")
+        private val KEY_ALLOWLIST_ORDER = stringPreferencesKey("allowlist_order")
         private val KEY_SIGIL_STATE = stringPreferencesKey("sigil_state")
 
         val DEFAULT_ALLOWLIST = setOf(
@@ -85,6 +86,14 @@ class PrefsRepository @Inject constructor(
         .withDefault(emptyPreferences())
         .map { prefs -> prefs[KEY_ALLOWLIST] ?: DEFAULT_ALLOWLIST }
 
+    val allowlistOrder: Flow<List<String>> = dataStore.data
+        .withDefault(emptyPreferences())
+        .map { prefs ->
+            prefs[KEY_ALLOWLIST_ORDER]?.let { json ->
+                runCatching { Json.decodeFromString<List<String>>(json) }.getOrNull()
+            } ?: emptyList()
+        }
+
     val sigilState: Flow<SigilState> = dataStore.data
         .withDefault(emptyPreferences())
         .map { prefs ->
@@ -120,6 +129,10 @@ class PrefsRepository @Inject constructor(
 
     suspend fun setAllowlist(packages: Set<String>) {
         dataStore.edit { it[KEY_ALLOWLIST] = packages }
+    }
+
+    suspend fun setAllowlistOrder(order: List<String>) {
+        dataStore.edit { it[KEY_ALLOWLIST_ORDER] = Json.encodeToString(order) }
     }
 
     suspend fun setSigilState(state: SigilState) {

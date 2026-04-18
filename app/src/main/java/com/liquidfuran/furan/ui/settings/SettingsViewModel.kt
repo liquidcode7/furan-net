@@ -25,7 +25,8 @@ data class SettingsUiState(
     val ntfyConfig: NtfyConfig = NtfyConfig(),
     val scheduleEnabled: Boolean = false,
     val weekSchedule: WeekSchedule = WeekSchedule(),
-    val allApps: List<AppInfo> = emptyList(),
+    val orderedAllowlist: List<AppInfo> = emptyList(),
+    val otherApps: List<AppInfo> = emptyList(),
     val allowlist: Set<String> = emptySet(),
     val isDeviceOwner: Boolean = false,
     val deviceOwnerCommand: String = ""
@@ -43,20 +44,21 @@ class SettingsViewModel @Inject constructor(
         prefsRepository.ntfyConfig,
         prefsRepository.scheduleEnabled,
         prefsRepository.weekSchedule,
-        prefsRepository.allowlist
-    ) { config, schedEnabled, schedule, allowlist ->
-        object {
-            val config = config; val schedEnabled = schedEnabled
-            val schedule = schedule; val allowlist = allowlist
-        }
-    }.map { data ->
-        val apps = appRepository.getAppsWithAllowlist(data.allowlist)
+        prefsRepository.allowlist,
+        prefsRepository.allowlistOrder
+    ) { config, schedEnabled, schedule, allowlist, order ->
+        val allApps = appRepository.getAppsWithAllowlist(allowlist)
+        val allowlistMap = allApps.filter { it.isAllowlisted }.associateBy { it.packageName }
+        val orderedAllowlist = (order.mapNotNull { allowlistMap[it] } +
+                allApps.filter { it.isAllowlisted && it.packageName !in order })
+        val otherApps = allApps.filter { !it.isAllowlisted }
         SettingsUiState(
-            ntfyConfig = data.config,
-            scheduleEnabled = data.schedEnabled,
-            weekSchedule = data.schedule,
-            allApps = apps,
-            allowlist = data.allowlist,
+            ntfyConfig = config,
+            scheduleEnabled = schedEnabled,
+            weekSchedule = schedule,
+            orderedAllowlist = orderedAllowlist,
+            otherApps = otherApps,
+            allowlist = allowlist,
             isDeviceOwner = deviceAdminManager.isDeviceOwner,
             deviceOwnerCommand = "adb shell dpm set-device-owner ${context.packageName}/.receiver.AdminReceiver"
         )
@@ -75,8 +77,32 @@ class SettingsViewModel @Inject constructor(
     fun toggleAllowlist(packageName: String, enabled: Boolean) {
         viewModelScope.launch {
             val current = prefsRepository.allowlist.first().toMutableSet()
-            if (enabled) current.add(packageName) else current.remove(packageName)
+            val currentOrder = prefsRepository.allowlistOrder.first().toMutableList()
+            if (enabled) {
+                current.add(packageName)
+                if (packageName !in currentOrder) currentOrder.add(packageName)
+            } else {
+                current.remove(packageName)
+                currentOrder.remove(packageName)
+            }
             prefsRepository.setAllowlist(current)
+            prefsRepository.setAllowlistOrder(currentOrder)
+        }
+    }
+
+    fun moveApp(packageName: String, up: Boolean) {
+        viewModelScope.launch {
+            val allowlist = prefsRepository.allowlist.first()
+            val order = prefsRepository.allowlistOrder.first().toMutableList()
+            // Ensure all allowlisted apps are in the order list
+            allowlist.forEach { if (it !in order) order.add(it) }
+            val idx = order.indexOf(packageName)
+            if (idx < 0) return@launch
+            val targetIdx = if (up) idx - 1 else idx + 1
+            if (targetIdx < 0 || targetIdx >= order.size) return@launch
+            order.removeAt(idx)
+            order.add(targetIdx, packageName)
+            prefsRepository.setAllowlistOrder(order)
         }
     }
 

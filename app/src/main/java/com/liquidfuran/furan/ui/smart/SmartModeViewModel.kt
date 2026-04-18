@@ -65,7 +65,7 @@ class SmartModeViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             val allowlist = prefsRepository.allowlist.first()
-            _allApps.value = appRepository.getAppsWithAllowlist(allowlist)
+            _allApps.value = appRepository.getAppsWithAllowlistSorted(allowlist)
             _isLoading.value = false
         }
     }

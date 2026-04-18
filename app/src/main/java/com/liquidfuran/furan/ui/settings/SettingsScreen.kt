@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -250,11 +252,23 @@ fun SettingsScreen(
                 item { Spacer(Modifier.height(8.dp)); SectionHeader("ALLOWLIST") }
                 item {
                     SettingsSubtext(
-                        "Apps visible and launchable in Dumb Mode. Allowlisted apps are also pinned to the top of the Smart Mode drawer.",
+                        "Apps visible in Dumb Mode. Use arrows to reorder.",
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-                items(state.allApps, key = { it.packageName }) { app ->
+                items(state.orderedAllowlist, key = { it.packageName }) { app ->
+                    val idx = state.orderedAllowlist.indexOf(app)
+                    AllowlistRow(
+                        app = app,
+                        onToggle = { viewModel.toggleAllowlist(app.packageName, it) },
+                        onMoveUp = if (idx > 0) { { viewModel.moveApp(app.packageName, up = true) } } else null,
+                        onMoveDown = if (idx < state.orderedAllowlist.lastIndex) { { viewModel.moveApp(app.packageName, up = false) } } else null
+                    )
+                }
+                if (state.otherApps.isNotEmpty()) {
+                    item { Spacer(Modifier.height(4.dp)); SectionHeader("ADD APPS") }
+                }
+                items(state.otherApps, key = { it.packageName }) { app ->
                     AllowlistRow(
                         app = app,
                         onToggle = { viewModel.toggleAllowlist(app.packageName, it) }
@@ -428,7 +442,12 @@ private fun NumberPicker(label: String, value: Int, min: Int, max: Int, step: In
 }
 
 @Composable
-private fun AllowlistRow(app: AppInfo, onToggle: (Boolean) -> Unit) {
+private fun AllowlistRow(
+    app: AppInfo,
+    onToggle: (Boolean) -> Unit,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
@@ -457,6 +476,33 @@ private fun AllowlistRow(app: AppInfo, onToggle: (Boolean) -> Unit) {
                 fontSize = 10.sp,
                 color = FuranColors.White.copy(alpha = 0.35f)
             )
+        }
+        if (onMoveUp != null || onMoveDown != null) {
+            Column {
+                IconButton(
+                    onClick = { onMoveUp?.invoke() },
+                    enabled = onMoveUp != null,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ArrowUpward, "Move up",
+                        tint = if (onMoveUp != null) FuranColors.Cyan else FuranColors.White.copy(alpha = 0.15f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { onMoveDown?.invoke() },
+                    enabled = onMoveDown != null,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ArrowDownward, "Move down",
+                        tint = if (onMoveDown != null) FuranColors.Cyan else FuranColors.White.copy(alpha = 0.15f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(4.dp))
         }
         Switch(
             checked = app.isAllowlisted,
