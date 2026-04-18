@@ -170,4 +170,3 @@ Manual lock (sigil tap / QS tile) always works. Scheduled unlock does not overri
 ---
 
 *lf · tetrafuranose*
-# furan-net
